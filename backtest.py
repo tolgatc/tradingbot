@@ -81,14 +81,14 @@ class EmaCross(bt.Strategy):
 
     def __init__(self):
         #ema filter
-        ema1 = bt.ind.EMA(period=self.p.period)  # fast moving average
+        ema1 = bt.ind.EMA(period=self.p.period,plot=False)  # fast moving average
         
-        rocema1 = bt.indicators.ROC100(ema1,period=20)
+        rocema1 = bt.indicators.ROC100(ema1,period=20,plot=False)
         #rocema2 = bt.indicators.ROC100(ema1,period=20)
         
-        slope = bt.talib.ATAN(rocema1) * (180/np.pi)
+        slope = bt.talib.ATAN(rocema1,plot=False) * (180/np.pi)
         #slope2 = bt.talib.ATAN(rocema2) * (180/np.pi)
-        bt.LinePlotterIndicator(slope, name='slope')
+        #bt.LinePlotterIndicator(slope, name='slope')
         slope_pos = slope > 45
         slope_neg= slope < -45
         self.dataclose = self.datas[0].close
@@ -125,7 +125,7 @@ class EmaCross(bt.Strategy):
         self.inTrade = 0
         self.buys = bt.And(self.irbb,slope_pos,atrFilter,self.inTrade == 0)
         self.sells = bt.And(self.irbs,slope_neg,atrFilter,self.inTrade == 0)
-
+        bt.LinePlotterIndicator(self.sells, name='slope')
         
     def next(self):
         self.log('Close, %.2f' % self.hilo_diff[0])
