@@ -130,29 +130,62 @@ class EmaCross(bt.Strategy):
         self.t_stop = np.NaN
         self.t_target = np.NaN
         
-    def next(self):
-        self.log('Close, %.2f' % self.inTrade)
+        self.order = None
         
-        if (self.inTrade==0) and (self.buys or self.sells):  # not in the market and buy/sell signal
+    #Keep track of orders here        
+    def notify_order(self, order):
+        if order.status in [order.Submitted, order.Accepted]:
+            # Buy/Sell order submitted/accepted to/by broker - Nothing to do
+            return
+
+        # Check if an order has been completed
+        # Attention: broker could reject order if not enough cash
+        if order.status in [order.Completed]:
+            if order.isbuy():
+                self.log('BUY EXECUTED, %.2f' % order.executed.price)
+            elif order.issell():
+                self.log('SELL EXECUTED, %.2f' % order.executed.price)
+
+            self.bar_executed = len(self)
+
+        elif order.status in [order.Canceled, order.Margin, order.Rejected]:
+            self.log('Order Canceled/Margin/Rejected')
+
+        # Write down: no pending order
+        self.order = None    
+    
+    def notify_trade(self, trade):
+        if not trade.isclosed:
+            return
+
+        self.log('OPERATION PROFIT, GROSS %.2f, NET %.2f' %
+                 (trade.pnl, trade.pnlcomm))    
+    
+    #Here we descirbe the strategy    
+    def next(self):
+        # Simply log the closing price of the series from the reference
+        self.log('Close, %.2f' % self.inTrade)
+
+        # Check if an order is pending ... if yes, we cannot send a 2nd one
+        if self.order:
+            return
+
+        #check if we are in market
+        if not self.position:
+            
             if self.buys:  # if fast crosses slow to the upside
                 self.t_stop = self.longStop[0]
                 self.t_target = self.longTarget[0]
-                self.buy()
+                self.order = self.buy()
+                self.log('BUY CREATE, %.2f' % self.dataclose[0])
                 self.inTrade = 1
-            else:
-                self.t_stop = self.shortStop[0]
-                self.t_target = self.shortTarget[0]
-                self.inTrade = -1
                 
 
-        if self.inTrade ==1 :  # in the market & cross to the downside
-            if (self.data.high >=self.t_target or self.data.low <=self.t_stop):
+        else:
+            if (self.data.high[0] >=self.t_target or self.data.low[0] <=self.t_stop):
                 self.inTrade=0
-                self.close()
-        elif self.inTrade==-1:
-            if (self.data.high >=self.t_stop or self.data.low <=self.t_target):
-                self.inTrade=0
-                self.close()
+                self.log('SELL CREATE, %.2f' % self.data.high[0])
+                self.order = self.sell()
             
     def log(self, txt, dt=None):
         ''' Logging function for this strategy'''
@@ -162,12 +195,13 @@ class EmaCross(bt.Strategy):
 
 
 cerebro = bt.Cerebro()
-
+# Start date and end date of strategy
 fromdate = datetime.datetime.strptime('2020-01-01', '%Y-%m-%d')
+# datetime.date.today()+datetime.timedelta(days=1)
+nr_of_days=40
+todate = fromdate + datetime.timedelta(days=nr_of_days)
 
-todate = datetime.datetime.strptime('2020-02-10', '%Y-%m-%d')
-
-data = bt.feeds.GenericCSVData(dataname='data/2020_15min.csv', dtformat=2,compression=15, timeframe=bt.TimeFrame.Minutes, fromdate=fromdate, todate=todate)
+data = bt.feeds.GenericCSVData(dataname='data/alltime_1h.csv', dtformat=2, fromdate=fromdate, todate=todate)
 
 cerebro.adddata(data)
 
@@ -180,8 +214,10 @@ cerebro.adddata(data)
 cerebro.addstrategy(EmaCross)
 
 cerebro.broker.setcommission(commission=0.001)
-
+cerebro.broker.setcash(10000.0)
+#cerebro.addsizer(bt.sizers.FixedSize, stake=0.1) #purchase 1 btcusdt, stake=1 default
 print('Starting Portfolio Value: %.2f' % cerebro.broker.getvalue())
+
 
 result=cerebro.run()
 

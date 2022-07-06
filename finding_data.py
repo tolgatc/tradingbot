@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+851948# -*- coding: utf-8 -*-
 """
 Created on Thu May 26 14:31:34 2022
 this script connects to binance api
@@ -35,7 +35,7 @@ candlewriter=csv.writer(f,delimiter=',')
 #    print(candlestick)
 #    candlewriter.writerow(candlestick)
     
-candles_old = client.get_historical_klines("BTCUSDT", Client.KLINE_INTERVAL_1HOUR, "1 Jan, 2020", "11 Jul, 2020")
+candles_old = client.get_historical_klines("BTCUSDT", Client.KLINE_INTERVAL_1HOUR, "1 Jan, 2000")
 for candlestick in candles_old:
     #print(candlestick)
     candlestick[0]=candlestick[0]/1000
