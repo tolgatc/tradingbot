@@ -76,7 +76,7 @@ class EmaCross(bt.Strategy):
         atrMinFilterSize = 0,
         atrMaxFilterSize=3,
         stopMultiplier=1,
-        rr=1
+        rr=1.5
     )
 
     def __init__(self):
@@ -113,29 +113,46 @@ class EmaCross(bt.Strategy):
         
         
         #Calculate long stops & targets
-        longStop = self.data.low - (atr * self.p.stopMultiplier) 
-        longStopDistance = self.data.close - longStop 
-        longTarget = self.data.high + (longStopDistance * self.p.rr)
+        self.longStop = self.data.low - (atr * self.p.stopMultiplier) 
+        longStopDistance = self.data.close - self.longStop 
+        self.longTarget = self.data.high + (longStopDistance * self.p.rr)
         
         #Calculate short(sellS) stops & targets
-        shortStop = self.data.high + (atr * self.p.stopMultiplier) 
-        shortStopDistance = shortStop - self.data.close 
-        shortTarget = self.data.low - (shortStopDistance * self.p.rr) 
+        self.shortStop = self.data.high + (atr * self.p.stopMultiplier) 
+        shortStopDistance = self.shortStop - self.data.close 
+        self.shortTarget = self.data.low - (shortStopDistance * self.p.rr) 
         
         self.inTrade = 0
         self.buys = bt.And(self.irbb,slope_pos,atrFilter,self.inTrade == 0)
         self.sells = bt.And(self.irbs,slope_neg,atrFilter,self.inTrade == 0)
-        bt.LinePlotterIndicator(self.sells, name='slope')
+        bt.LinePlotterIndicator(self.buys, name='buys')
+        
+        self.t_stop = np.NaN
+        self.t_target = np.NaN
         
     def next(self):
-        self.log('Close, %.2f' % self.hilo_diff[0])
+        self.log('Close, %.2f' % self.inTrade)
         
-        if not self.position:  # not in the market
+        if (self.inTrade==0) and (self.buys or self.sells):  # not in the market and buy/sell signal
             if self.buys:  # if fast crosses slow to the upside
-                self.buy()  # enter long
+                self.t_stop = self.longStop[0]
+                self.t_target = self.longTarget[0]
+                self.buy()
+                self.inTrade = 1
+            else:
+                self.t_stop = self.shortStop[0]
+                self.t_target = self.shortTarget[0]
+                self.inTrade = -1
+                
 
-        elif self.sells:  # in the market & cross to the downside
-            self.close()  # close long position
+        if self.inTrade ==1 :  # in the market & cross to the downside
+            if (self.data.high >=self.t_target or self.data.low <=self.t_stop):
+                self.inTrade=0
+                self.close()
+        elif self.inTrade==-1:
+            if (self.data.high >=self.t_stop or self.data.low <=self.t_target):
+                self.inTrade=0
+                self.close()
             
     def log(self, txt, dt=None):
         ''' Logging function for this strategy'''
@@ -148,7 +165,7 @@ cerebro = bt.Cerebro()
 
 fromdate = datetime.datetime.strptime('2020-01-01', '%Y-%m-%d')
 
-todate = datetime.datetime.strptime('2020-02-15', '%Y-%m-%d')
+todate = datetime.datetime.strptime('2020-02-10', '%Y-%m-%d')
 
 data = bt.feeds.GenericCSVData(dataname='data/2020_15min.csv', dtformat=2,compression=15, timeframe=bt.TimeFrame.Minutes, fromdate=fromdate, todate=todate)
 
