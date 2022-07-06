@@ -170,22 +170,30 @@ class EmaCross(bt.Strategy):
         if self.order:
             return
 
-        #check if we are in market
-        if not self.position:
-            
+        if (self.inTrade==0) and (self.buys or self.sells):  # not in the market and buy/sell signal
             if self.buys:  # if fast crosses slow to the upside
                 self.t_stop = self.longStop[0]
                 self.t_target = self.longTarget[0]
                 self.order = self.buy()
                 self.log('BUY CREATE, %.2f' % self.dataclose[0])
                 self.inTrade = 1
+            else:
+                self.t_stop = self.shortStop[0]
+                self.t_target = self.shortTarget[0]
+                self.inTrade = 0
+                self.order = self.close()
+                self.log('SELL CREATE, %.2f' % self.dataclose[0])
                 
-
-        else:
-            if (self.data.high[0] >=self.t_target or self.data.low[0] <=self.t_stop):
+        if self.inTrade ==1 :  # in the market & cross to the downside
+            if (self.data.high >=self.t_target or self.data.low <=self.t_stop):
                 self.inTrade=0
-                self.log('SELL CREATE, %.2f' % self.data.high[0])
                 self.order = self.sell()
+                self.log('SELL CREATE, %.2f' % self.data.high[0])
+        elif self.inTrade== -1:
+            if (self.data.high >=self.t_stop or self.data.low <=self.t_target):
+                self.inTrade=0
+                self.order=self.close()
+                self.log('BUY CREATE, %.2f' % self.dataclose[0])
             
     def log(self, txt, dt=None):
         ''' Logging function for this strategy'''
